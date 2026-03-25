@@ -127,6 +127,18 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     encrypted = collect_encrypted_vars(args.keys)
+
+    # Warn about matching keys that are NOT encrypted
+    key_res = [re.compile(p) for p in args.keys]
+    unencrypted = [
+        k for k, v in os.environ.items()
+        if not v.startswith(PREFIX) and any(r.fullmatch(k) for r in key_res)
+    ]
+    if unencrypted:
+        print(f"# WARNING: {len(unencrypted)} matching variable(s) are NOT encrypted:", file=sys.stderr)
+        for k in sorted(unencrypted):
+            print(f"#   {k}", file=sys.stderr)
+
     if not encrypted:
         print("# No matching encrypted env vars found.", file=sys.stderr)
         return
