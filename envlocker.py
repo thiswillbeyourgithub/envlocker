@@ -153,7 +153,7 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
     from prompt_toolkit.completion import WordCompleter
 
     var_names = sorted(encrypted.keys())
-    completer = WordCompleter(var_names, sentence=True)
+    completer = WordCompleter(var_names, sentence=True, ignore_case=True)
 
     print(f"# {len(var_names)} encrypted variable(s) available.", file=sys.stderr)
     selection = pt_prompt(
