@@ -73,6 +73,8 @@ def derive_key(password: str, salt: str, key_name: str) -> bytes:
 
 def encrypt_value(password: str, salt: str, key_name: str, plaintext: str) -> str:
     """Encrypt a value, return PREFIX + base64(nonce + ciphertext)."""
+    if plaintext.startswith(PREFIX):
+        raise ValueError(f"value for {key_name} is already encrypted (starts with {PREFIX})")
     key = derive_key(password, salt, key_name)
     aesgcm = AESGCM(key)
     nonce = os.urandom(12)
