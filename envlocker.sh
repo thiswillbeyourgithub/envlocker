@@ -240,8 +240,8 @@ def main() -> None:
     parser.add_argument(
         "--keys",
         nargs="*",
-        default=[".*_KEY"],
-        help="Regex patterns matching env var names (default: .*_KEY)",
+        default=[r".*(?:^|_)(?:PASS|PSWD|PASSWORD|PASSPHRASE|KEY)(?:_.*|$)"],
+        help="Regex patterns matching env var names (default: names containing PASS, PSWD, PASSWORD, PASSPHRASE, or KEY as word segments)",
     )
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("encrypt", help="Encrypt matching env vars")
