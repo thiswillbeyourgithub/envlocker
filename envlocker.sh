@@ -2,7 +2,7 @@
 # Source this file in your shell rc.
 # Built with Claude Code.
 #
-# Usage: envlocker [--keys PATTERN...] encrypt|decrypt
+# Usage: envlocker [--keys PATTERN...] encrypt|decrypt [KEY]|decrypt-all
 
 _ENVLOCKER_PY='#!/usr/bin/env python3
 # /// script
@@ -144,6 +144,17 @@ def cmd_encrypt(args: argparse.Namespace) -> None:
         _write_export(k, encrypted)
 
 
+def _decrypt_vars(encrypted: dict[str, str], salt: str, password: str) -> None:
+    """Decrypt and export a dict of encrypted vars."""
+    for k in sorted(encrypted):
+        try:
+            value = decrypt_value(password, salt, k, encrypted[k])
+        except Exception:
+            print(f"Decryption failed for {k} — wrong password or corrupted data.", file=sys.stderr)
+            sys.exit(1)
+        _write_export(k, value)
+
+
 def cmd_decrypt(args: argparse.Namespace) -> None:
     salt = os.environ.get(SALT_ENV, "")
     if not salt:
@@ -167,6 +178,16 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
         print("# No matching encrypted env vars found.", file=sys.stderr)
         return
 
+    # If a specific key name was given, decrypt it directly
+    if args.name:
+        selection = args.name
+        if selection not in encrypted:
+            print(f"Unknown variable: {selection}", file=sys.stderr)
+            sys.exit(1)
+        password = getpass("Password: ")
+        _decrypt_vars({selection: encrypted[selection]}, salt, password)
+        return
+
     # Interactive selection with autocomplete
     from prompt_toolkit import prompt as pt_prompt
     from prompt_toolkit.completion import WordCompleter
@@ -184,13 +205,26 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     password = getpass("Password: ")
-    try:
-        value = decrypt_value(password, salt, selection, encrypted[selection])
-    except Exception:
-        print("Decryption failed — wrong password or corrupted data.", file=sys.stderr)
+    _decrypt_vars({selection: encrypted[selection]}, salt, password)
+
+
+def cmd_decrypt_all(args: argparse.Namespace) -> None:
+    salt = os.environ.get(SALT_ENV, "")
+    if not salt:
+        print(f"Error: {SALT_ENV} not set.", file=sys.stderr)
         sys.exit(1)
 
-    _write_export(selection, value)
+    encrypted = collect_encrypted_vars(args.keys)
+    if not encrypted:
+        print("# No matching encrypted env vars found.", file=sys.stderr)
+        return
+
+    print(f"# Decrypting {len(encrypted)} variable(s):", file=sys.stderr)
+    for k in sorted(encrypted):
+        print(f"#   {k}", file=sys.stderr)
+
+    password = getpass("Password: ")
+    _decrypt_vars(encrypted, salt, password)
 
 
 def main() -> None:
@@ -205,13 +239,17 @@ def main() -> None:
     )
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("encrypt", help="Encrypt matching env vars")
-    sub.add_parser("decrypt", help="Decrypt a selected env var")
+    dec = sub.add_parser("decrypt", help="Decrypt a selected env var")
+    dec.add_argument("name", nargs="?", default=None, help="Variable name to decrypt (skip interactive prompt)")
+    sub.add_parser("decrypt-all", help="Decrypt all matching encrypted env vars")
 
     args = parser.parse_args()
     if args.command == "encrypt":
         cmd_encrypt(args)
     elif args.command == "decrypt":
         cmd_decrypt(args)
+    elif args.command == "decrypt-all":
+        cmd_decrypt_all(args)
 
 
 if __name__ == "__main__":
