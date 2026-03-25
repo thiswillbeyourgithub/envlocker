@@ -25,7 +25,20 @@ from getpass import getpass
 
 PREFIX = "EVL:"
 SALT_ENV = "ENVLOCKER_SALT"
+TMPFILE_ENV = "ENVLOCKER_TMPFILE"
 MIN_SALT_LEN = 256
+
+
+def _write_export(key: str, value: str) -> None:
+    """Write an export line to ENVLOCKER_TMPFILE (if set) or stdout."""
+    line = f'export {key}="{value}"'
+    tmpfile = os.environ.get(TMPFILE_ENV, "")
+    if tmpfile:
+        with open(tmpfile, "a") as f:
+            f.write(line + "\n")
+        print(f"# Exported {key}", file=sys.stderr)
+    else:
+        print(line)
 
 
 def get_or_create_salt() -> str:
@@ -114,7 +127,7 @@ def cmd_encrypt(args: argparse.Namespace) -> None:
         print("Passwords do not match.", file=sys.stderr)
         sys.exit(1)
 
-    print("\n# Paste these into your shell rc, replacing the current values:")
+    print("\n# Paste these into your shell rc, replacing the current values:", file=sys.stderr)
     for k in sorted(candidates):
         encrypted = encrypt_value(password, salt, k, candidates[k])
         # Verify roundtrip
@@ -122,7 +135,7 @@ def cmd_encrypt(args: argparse.Namespace) -> None:
         if decrypted != candidates[k]:
             print(f"ERROR: roundtrip verification failed for {k}!", file=sys.stderr)
             sys.exit(1)
-        print(f'export {k}="{encrypted}"')
+        _write_export(k, encrypted)
 
 
 def cmd_decrypt(args: argparse.Namespace) -> None:
@@ -171,8 +184,7 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
         print("Decryption failed — wrong password or corrupted data.", file=sys.stderr)
         sys.exit(1)
 
-    # Output export command for eval
-    print(f'export {selection}="{value}"')
+    _write_export(selection, value)
 
 
 def main() -> None:
