@@ -35,7 +35,7 @@ source /path/to/envlocker.sh
 
 ### Encrypt
 
-Encrypt all env vars whose names match `.*_KEY` (the default pattern):
+Encrypt all env vars whose names contain common secret-related keywords (`PASS`, `PSWD`, `PASSWORD`, `PASSPHRASE`, `KEY`, `SECRET`, `TOKEN`, `SALT`, `TKN`):
 
 ```bash
 envlocker encrypt
@@ -73,12 +73,23 @@ envlocker decrypt-all
 
 ### Key patterns
 
-The `--keys` flag accepts regex patterns matched against variable names. The default is `.*_KEY`. Examples:
+The `--keys` flag accepts regex patterns matched against variable names. The default pattern matches names containing `PASS`, `PSWD`, `PASSWORD`, `PASSPHRASE`, `KEY`, `SECRET`, `TOKEN`, `SALT`, or `TKN` as word segments (delimited by `_` or string boundaries). Examples:
 
 ```bash
 envlocker --keys '.*' decrypt-all          # all encrypted vars
 envlocker --keys 'AWS_.*' decrypt-all      # only AWS-related vars
 ```
+
+### Ignoring variables
+
+The `--ignore` flag excludes specific variable names from matching. This is useful when a default keyword appears in a non-secret context (e.g. a company name containing "SALT"):
+
+```bash
+envlocker --ignore 'COMPANY_SALT_NAME' encrypt
+envlocker --ignore 'COMPANY_SALT_.*' decrypt-all
+```
+
+`--ignore` accepts regex patterns, just like `--keys`.
 
 ## Portability
 
