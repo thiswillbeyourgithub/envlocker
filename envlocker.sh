@@ -182,9 +182,10 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
 
     # Warn about matching keys that are NOT encrypted
     key_res = [re.compile(p) for p in args.keys]
+    own_vars = {SALT_ENV, TMPFILE_ENV}
     unencrypted = [
         k for k, v in os.environ.items()
-        if not v.startswith(PREFIX) and any(r.fullmatch(k) for r in key_res) and not _is_ignored(k, args.ignore)
+        if k not in own_vars and not v.startswith(PREFIX) and any(r.fullmatch(k) for r in key_res) and not _is_ignored(k, args.ignore)
     ]
     if unencrypted:
         print(f"# WARNING: {len(unencrypted)} matching variable(s) are NOT encrypted:", file=sys.stderr)
