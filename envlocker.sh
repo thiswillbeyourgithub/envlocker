@@ -8,8 +8,8 @@ _ENVLOCKER_PY='#!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "cryptography",
-#     "prompt_toolkit",
+#     "cryptography==46.0.5",
+#     "prompt_toolkit==3.0.52",
 # ]
 # ///
 # Built with Claude Code
