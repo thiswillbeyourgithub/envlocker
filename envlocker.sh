@@ -121,7 +121,10 @@ def cmd_encrypt(args: argparse.Namespace) -> None:
     # For encrypt: match keys, exclude already-encrypted values
     key_res = [re.compile(p) for p in args.keys]
     candidates = {}
+    own_vars = {SALT_ENV, TMPFILE_ENV}
     for k, v in os.environ.items():
+        if k in own_vars:
+            continue
         if not v.startswith(PREFIX) and any(r.fullmatch(k) for r in key_res) and not _is_ignored(k, args.ignore):
             candidates[k] = v
 
