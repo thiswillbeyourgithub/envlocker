@@ -152,6 +152,12 @@ def _decrypt_vars(encrypted: dict[str, str], salt: str, password: str) -> None:
         except Exception:
             print(f"Decryption failed for {k} — wrong password or corrupted data.", file=sys.stderr)
             sys.exit(1)
+        # Roundtrip sanity check: re-encrypt then decrypt again
+        reencrypted = encrypt_value(password, salt, k, value)
+        redecrypted = decrypt_value(password, salt, k, reencrypted)
+        if redecrypted != value:
+            print(f"ERROR: roundtrip verification failed for {k}!", file=sys.stderr)
+            sys.exit(1)
         _write_export(k, value)
 
 
