@@ -117,6 +117,11 @@ def cmd_encrypt(args: argparse.Namespace) -> None:
     print("\n# Paste these into your shell rc, replacing the current values:")
     for k in sorted(candidates):
         encrypted = encrypt_value(password, salt, k, candidates[k])
+        # Verify roundtrip
+        decrypted = decrypt_value(password, salt, k, encrypted)
+        if decrypted != candidates[k]:
+            print(f"ERROR: roundtrip verification failed for {k}!", file=sys.stderr)
+            sys.exit(1)
         print(f'export {k}="{encrypted}"')
 
 
