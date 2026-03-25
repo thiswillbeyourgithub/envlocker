@@ -42,7 +42,7 @@ def _write_export(key: str, value: str) -> None:
     if tmpfile:
         with open(tmpfile, "a") as f:
             f.write(line + "\n")
-        print(f"# Exported {key}", file=sys.stderr)
+        print(line, file=sys.stderr)
     else:
         print(line)
 
