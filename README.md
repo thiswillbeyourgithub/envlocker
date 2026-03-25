@@ -73,7 +73,7 @@ envlocker decrypt-all
 
 ### Key patterns
 
-The `--keys` flag accepts regex patterns matched against variable names. The default pattern matches names containing `PASS`, `PSWD`, `PASSWORD`, `PASSPHRASE`, `KEY`, `SECRET`, `TOKEN`, `SALT`, or `TKN` as word segments (delimited by `_` or string boundaries). Examples:
+The `--keys` flag accepts regex patterns matched against variable names. The default pattern matches names containing `PASS`, `PSWD`, `PASSWORD`, `PASSPHRASE`, `KEY`, `SECRET`, `TOKEN`, `SALT`, or `TKN` anywhere in the name. Examples:
 
 ```bash
 envlocker --keys '.*' decrypt-all          # all encrypted vars

@@ -249,8 +249,8 @@ def main() -> None:
     parser.add_argument(
         "--keys",
         nargs="*",
-        default=[r".*(?:^|_)(?:PASS|PSWD|PASSWORD|PASSPHRASE|KEY|SECRET|TOKEN|SALT|TKN)(?:_.*|$)"],
-        help="Regex patterns matching env var names (default: names containing PASS, PSWD, PASSWORD, PASSPHRASE, KEY, SECRET, TOKEN, SALT, or TKN as word segments)",
+        default=[r".*(?:PASS|PSWD|PASSWORD|PASSPHRASE|KEY|SECRET|TOKEN|SALT|TKN).*"],
+        help="Regex patterns matching env var names (default: names containing PASS, PSWD, PASSWORD, PASSPHRASE, KEY, SECRET, TOKEN, SALT, or TKN anywhere in the name)",
     )
     parser.add_argument(
         "--ignore",
