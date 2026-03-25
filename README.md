@@ -6,9 +6,9 @@ Built with [Claude Code](https://claude.ai/code).
 
 ## Why?
 
-Shell profiles (`.bashrc`, `.zshrc`) often contain secrets — API keys, tokens, credentials — exported as plain-text environment variables. If your dotfiles are synced across devices (e.g. via Syncthing or a git repo), those secrets travel in the clear.
+Shell profiles (`.bashrc`, `.zshrc`) often contain secrets — API keys, tokens, credentials — exported as plain-text environment variables. That means a single point of failure that can be accessed by any program on your system.
 
-envlocker lets you store encrypted values in your shell rc instead. You only need a password to unlock them when you need them. The goal is a **minimal, portable, and secure** setup: to move to a new device, all you need is a shell, `uv`, the script, and your salt.
+envlocker lets you store encrypted values in your shell rc instead. You only need a password to unlock them when you need them. The goal is a **minimal, portable, and secure** setup: to move to a new device, all you need is a shell with `uv` and this  script.
 
 ## How it works
 
