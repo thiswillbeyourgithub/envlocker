@@ -2,7 +2,7 @@
 # Source this file in your shell rc.
 # Built with Claude Code.
 #
-# Usage: envlocker [--keys PATTERN...] encrypt|decrypt [KEY]|decrypt-all
+# Usage: envlocker [--keys PATTERN...] [--ignore PATTERN...] encrypt|decrypt [KEY]|decrypt-all
 
 _ENVLOCKER_PY='#!/usr/bin/env python3
 # /// script
@@ -100,12 +100,18 @@ def collect_env_vars(key_patterns: list[str], value_patterns: list[str]) -> dict
     return result
 
 
-def collect_encrypted_vars(key_patterns: list[str]) -> dict[str, str]:
+def _is_ignored(name: str, ignore_patterns: list[str]) -> bool:
+    """Return True if name matches any ignore pattern."""
+    return any(re.fullmatch(p, name) for p in ignore_patterns)
+
+
+def collect_encrypted_vars(key_patterns: list[str], ignore_patterns: list[str] | None = None) -> dict[str, str]:
     """Return env vars matching key patterns whose values start with EVL:."""
     key_res = [re.compile(p) for p in key_patterns]
+    ignore = ignore_patterns or []
     result = {}
     for k, v in os.environ.items():
-        if v.startswith(PREFIX) and any(r.fullmatch(k) for r in key_res):
+        if v.startswith(PREFIX) and any(r.fullmatch(k) for r in key_res) and not _is_ignored(k, ignore):
             result[k] = v
     return result
 
@@ -116,7 +122,7 @@ def cmd_encrypt(args: argparse.Namespace) -> None:
     key_res = [re.compile(p) for p in args.keys]
     candidates = {}
     for k, v in os.environ.items():
-        if not v.startswith(PREFIX) and any(r.fullmatch(k) for r in key_res):
+        if not v.startswith(PREFIX) and any(r.fullmatch(k) for r in key_res) and not _is_ignored(k, args.ignore):
             candidates[k] = v
 
     if not candidates:
@@ -167,13 +173,13 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
         print(f"Error: {SALT_ENV} not set.", file=sys.stderr)
         sys.exit(1)
 
-    encrypted = collect_encrypted_vars(args.keys)
+    encrypted = collect_encrypted_vars(args.keys, args.ignore)
 
     # Warn about matching keys that are NOT encrypted
     key_res = [re.compile(p) for p in args.keys]
     unencrypted = [
         k for k, v in os.environ.items()
-        if not v.startswith(PREFIX) and any(r.fullmatch(k) for r in key_res)
+        if not v.startswith(PREFIX) and any(r.fullmatch(k) for r in key_res) and not _is_ignored(k, args.ignore)
     ]
     if unencrypted:
         print(f"# WARNING: {len(unencrypted)} matching variable(s) are NOT encrypted:", file=sys.stderr)
@@ -220,7 +226,7 @@ def cmd_decrypt_all(args: argparse.Namespace) -> None:
         print(f"Error: {SALT_ENV} not set.", file=sys.stderr)
         sys.exit(1)
 
-    encrypted = collect_encrypted_vars(args.keys)
+    encrypted = collect_encrypted_vars(args.keys, args.ignore)
     if not encrypted:
         print("# No matching encrypted env vars found.", file=sys.stderr)
         return
@@ -240,8 +246,14 @@ def main() -> None:
     parser.add_argument(
         "--keys",
         nargs="*",
-        default=[r".*(?:^|_)(?:PASS|PSWD|PASSWORD|PASSPHRASE|KEY|SECRET)(?:_.*|$)"],
-        help="Regex patterns matching env var names (default: names containing PASS, PSWD, PASSWORD, PASSPHRASE, KEY, or SECRET as word segments)",
+        default=[r".*(?:^|_)(?:PASS|PSWD|PASSWORD|PASSPHRASE|KEY|SECRET|TOKEN|SALT|TKN)(?:_.*|$)"],
+        help="Regex patterns matching env var names (default: names containing PASS, PSWD, PASSWORD, PASSPHRASE, KEY, SECRET, TOKEN, SALT, or TKN as word segments)",
+    )
+    parser.add_argument(
+        "--ignore",
+        nargs="*",
+        default=[],
+        help="Regex patterns for env var names to exclude (e.g. COMPANY_SALT)",
     )
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("encrypt", help="Encrypt matching env vars")
