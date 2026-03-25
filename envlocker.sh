@@ -279,24 +279,24 @@ if __name__ == "__main__":
 
 envlocker() {
     if [ -n "${ENVLOCKER_TMPFILE:-}" ]; then
-        echo "Error: ENVLOCKER_TMPFILE is already set — another envlocker may be running." >&2
+        command echo "Error: ENVLOCKER_TMPFILE is already set — another envlocker may be running." >&2
         return 1
     fi
 
     local tmpfile pytmp
-    tmpfile="$(mktemp)" || { echo "Error: failed to create temp file." >&2; return 1; }
-    pytmp="$(mktemp --suffix=.py)" || { rm -f "$tmpfile"; echo "Error: failed to create temp file." >&2; return 1; }
+    tmpfile="$(command mktemp)" || { command echo "Error: failed to create temp file." >&2; return 1; }
+    pytmp="$(command mktemp --suffix=.py)" || { command rm -f "$tmpfile"; command echo "Error: failed to create temp file." >&2; return 1; }
     export ENVLOCKER_TMPFILE="$tmpfile"
 
-    printf '%s' "$_ENVLOCKER_PY" > "$pytmp"
-    uv run "$pytmp" "$@"
+    command printf '%s' "$_ENVLOCKER_PY" > "$pytmp"
+    command uv run "$pytmp" "$@"
     local rc=$?
 
     if [ $rc -eq 0 ] && [ -s "$tmpfile" ]; then
         . "$tmpfile"
     fi
 
-    rm -f "$tmpfile" "$pytmp"
+    command rm -f "$tmpfile" "$pytmp"
     unset ENVLOCKER_TMPFILE
     return $rc
 }
