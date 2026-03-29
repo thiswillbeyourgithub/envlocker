@@ -18,7 +18,7 @@ envlocker is a single shell script (`envlocker.sh`) that embeds a Python script.
 - **Dependencies**: [`cryptography==46.0.5`](https://pypi.org/project/cryptography/) and [`prompt_toolkit==3.0.52`](https://pypi.org/project/prompt-toolkit/), pinned for reproducibility
 - **Runtime**: [uv](https://docs.astral.sh/uv/) manages the Python environment and dependencies automatically
 
-Each variable is encrypted with a key derived from your password + a per-install salt (`ENVLOCKER_SALT`) + the variable name itself. Encrypted values are prefixed with `EVL:` so they're easy to identify.
+Each variable is encrypted with a key derived from your password + a per-install salt (`ENVLOCKER_SALT`) + the variable name itself. Encrypted variable names are prefixed with `EVL_` and their values with `EVL:`, so they're easy to identify. For example, encrypting `MY_API_KEY` produces `EVL_MY_API_KEY=EVL:...`, and the original `MY_API_KEY` is unset. On decryption, the original name is restored.
 
 ## Setup
 
@@ -47,7 +47,7 @@ Encrypt vars matching custom patterns:
 envlocker --keys 'OPENAI_.*' 'ANTHROPIC_.*' encrypt
 ```
 
-You'll be prompted for a password (with confirmation). The output is a set of `export` lines with encrypted values — replace the originals in your shell rc.
+You'll be prompted for a password (with confirmation). The output is a set of `export EVL_<NAME>=EVL:...` lines along with `unset <NAME>` lines — replace the originals in your shell rc.
 
 ### Decrypt a single variable
 
@@ -96,7 +96,7 @@ envlocker --ignore 'COMPANY_SALT_.*' decrypt-all
 To set up on a new device:
 
 1. Copy `envlocker.sh` (or sync it with your dotfiles)
-2. Copy your shell rc with the encrypted `export` lines and the `ENVLOCKER_SALT`
+2. Copy your shell rc with the encrypted `export EVL_...` lines and the `ENVLOCKER_SALT`
 3. Install `uv`
 4. `source envlocker.sh` and `envlocker decrypt-all` — done
 
@@ -109,6 +109,7 @@ No Python virtualenv to manage, no config files, no database. Everything lives i
 - The salt is unique per install, so identical passwords on different machines produce different ciphertexts
 - The variable name is mixed into both the key derivation and the authentication tag, preventing value-swapping between variables
 - Both encrypt and decrypt perform roundtrip verification to catch corruption
+- The `EVL_` name prefix ensures the original (plaintext) variable is never set alongside the encrypted one
 - Decrypted values only exist in shell memory — they are never written to persistent storage
 
 ## License
