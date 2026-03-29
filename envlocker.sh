@@ -30,14 +30,14 @@ from getpass import getpass
 
 
 PREFIX = "EVL:"
+NAME_PREFIX = "EVL_"
 SALT_ENV = "ENVLOCKER_SALT"
 TMPFILE_ENV = "ENVLOCKER_TMPFILE"
 MIN_SALT_LEN = 256
 
 
-def _write_export(key: str, value: str) -> None:
-    """Write an export line to ENVLOCKER_TMPFILE (if set) or stdout."""
-    line = f'"'"'export {key}="{value}"'"'"'
+def _write_line(line: str) -> None:
+    """Write a shell line to ENVLOCKER_TMPFILE (if set) or stdout."""
     tmpfile = os.environ.get(TMPFILE_ENV, "")
     if tmpfile:
         with open(tmpfile, "a") as f:
@@ -45,6 +45,16 @@ def _write_export(key: str, value: str) -> None:
         print(line, file=sys.stderr)
     else:
         print(line)
+
+
+def _write_export(key: str, value: str) -> None:
+    """Write an export line."""
+    _write_line(f'"'"'export {key}="{value}"'"'"')
+
+
+def _write_unset(key: str) -> None:
+    """Write an unset line."""
+    _write_line(f'"'"'unset {key}'"'"')
 
 
 def get_or_create_salt() -> str:
@@ -107,25 +117,33 @@ def _is_ignored(name: str, ignore_patterns: list[str]) -> bool:
     return any(re.fullmatch(p, name) for p in ignore_patterns)
 
 
+def original_name(k: str) -> str:
+    """Strip the EVL_ prefix from a variable name."""
+    if k.startswith(NAME_PREFIX):
+        return k[len(NAME_PREFIX):]
+    return k
+
+
 def collect_encrypted_vars(key_patterns: list[str], ignore_patterns: list[str] | None = None) -> dict[str, str]:
-    """Return env vars matching key patterns whose values start with EVL:."""
+    """Return env vars with EVL_ prefix and EVL: value, matching key patterns against original name."""
     key_res = [re.compile(p) for p in key_patterns]
     ignore = ignore_patterns or []
     result = {}
     for k, v in os.environ.items():
-        if v.startswith(PREFIX) and any(r.fullmatch(k) for r in key_res) and not _is_ignored(k, ignore):
+        orig = original_name(k)
+        if k.startswith(NAME_PREFIX) and v.startswith(PREFIX) and any(r.fullmatch(orig) for r in key_res) and not _is_ignored(orig, ignore):
             result[k] = v
     return result
 
 
 def cmd_encrypt(args: argparse.Namespace) -> None:
     salt = get_or_create_salt()
-    # For encrypt: match keys, exclude already-encrypted values
+    # For encrypt: match keys, exclude already-encrypted values and EVL_-prefixed vars
     key_res = [re.compile(p) for p in args.keys]
     candidates = {}
     own_vars = {SALT_ENV, TMPFILE_ENV}
     for k, v in os.environ.items():
-        if k in own_vars:
+        if k in own_vars or k.startswith(NAME_PREFIX):
             continue
         if not v.startswith(PREFIX) and any(r.fullmatch(k) for r in key_res) and not _is_ignored(k, args.ignore):
             candidates[k] = v
@@ -152,24 +170,27 @@ def cmd_encrypt(args: argparse.Namespace) -> None:
         if decrypted != candidates[k]:
             print(f"ERROR: roundtrip verification failed for {k}!", file=sys.stderr)
             sys.exit(1)
-        _write_export(k, encrypted)
+        _write_export(NAME_PREFIX + k, encrypted)
+        _write_unset(k)
 
 
 def _decrypt_vars(encrypted: dict[str, str], salt: str, password: str) -> None:
-    """Decrypt and export a dict of encrypted vars."""
+    """Decrypt and export a dict of encrypted vars (EVL_NAME -> NAME)."""
     for k in sorted(encrypted):
+        orig = original_name(k)
         try:
-            value = decrypt_value(password, salt, k, encrypted[k])
+            value = decrypt_value(password, salt, orig, encrypted[k])
         except Exception:
             print(f"Decryption failed for {k} — wrong password or corrupted data.", file=sys.stderr)
             sys.exit(1)
         # Roundtrip sanity check: re-encrypt then decrypt again
-        reencrypted = encrypt_value(password, salt, k, value)
-        redecrypted = decrypt_value(password, salt, k, reencrypted)
+        reencrypted = encrypt_value(password, salt, orig, value)
+        redecrypted = decrypt_value(password, salt, orig, reencrypted)
         if redecrypted != value:
             print(f"ERROR: roundtrip verification failed for {k}!", file=sys.stderr)
             sys.exit(1)
-        _write_export(k, value)
+        _write_export(orig, value)
+        _write_unset(k)
 
 
 def cmd_decrypt(args: argparse.Namespace) -> None:
@@ -180,12 +201,12 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
 
     encrypted = collect_encrypted_vars(args.keys, args.ignore)
 
-    # Warn about matching keys that are NOT encrypted
+    # Warn about matching keys that are NOT encrypted (no EVL_ prefix)
     key_res = [re.compile(p) for p in args.keys]
     own_vars = {SALT_ENV, TMPFILE_ENV}
     unencrypted = [
         k for k, v in os.environ.items()
-        if k not in own_vars and not v.startswith(PREFIX) and any(r.fullmatch(k) for r in key_res) and not _is_ignored(k, args.ignore)
+        if k not in own_vars and not k.startswith(NAME_PREFIX) and not v.startswith(PREFIX) and any(r.fullmatch(k) for r in key_res) and not _is_ignored(k, args.ignore)
     ]
     if unencrypted:
         print(f"# WARNING: {len(unencrypted)} matching variable(s) are NOT encrypted:", file=sys.stderr)
@@ -197,28 +218,37 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
         return
 
     # If a specific key name was given, decrypt it directly
+    # Accept both EVL_FOO and FOO as input
     if args.name:
         selection = args.name
         if selection not in encrypted:
-            print(f"Unknown variable: {selection}", file=sys.stderr)
-            sys.exit(1)
+            prefixed = NAME_PREFIX + selection
+            if prefixed in encrypted:
+                selection = prefixed
+            else:
+                print(f"Unknown variable: {selection}", file=sys.stderr)
+                sys.exit(1)
         password = getpass("Password: ")
         _decrypt_vars({selection: encrypted[selection]}, salt, password)
         return
 
-    # Interactive selection with autocomplete
+    # Interactive selection with autocomplete — show original names
     from prompt_toolkit import prompt as pt_prompt
     from prompt_toolkit.completion import WordCompleter
 
-    var_names = sorted(encrypted.keys())
-    completer = WordCompleter(var_names, sentence=True, ignore_case=True)
+    orig_names = sorted(original_name(k) for k in encrypted)
+    completer = WordCompleter(orig_names, sentence=True, ignore_case=True)
 
-    print(f"# {len(var_names)} encrypted variable(s) available.", file=sys.stderr)
+    print(f"# {len(orig_names)} encrypted variable(s) available.", file=sys.stderr)
     selection = pt_prompt(
         "Variable to decrypt (tab to autocomplete): ", completer=completer
     ).strip()
 
-    if selection not in encrypted:
+    # Map back to EVL_ prefixed name
+    prefixed = NAME_PREFIX + selection
+    if prefixed in encrypted:
+        selection = prefixed
+    elif selection not in encrypted:
         print(f"Unknown variable: {selection}", file=sys.stderr)
         sys.exit(1)
 
