@@ -226,7 +226,10 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
             if prefixed in encrypted:
                 selection = prefixed
             else:
-                print(f"Unknown variable: {selection}", file=sys.stderr)
+                if selection in os.environ or prefixed in os.environ:
+                    print(f"Unknown variable: {selection} (but it is already set in the environment, perhaps already decrypted?)", file=sys.stderr)
+                else:
+                    print(f"Unknown variable: {selection}", file=sys.stderr)
                 sys.exit(1)
         password = getpass("Password: ")
         _decrypt_vars({selection: encrypted[selection]}, salt, password)
@@ -249,7 +252,10 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
     if prefixed in encrypted:
         selection = prefixed
     elif selection not in encrypted:
-        print(f"Unknown variable: {selection}", file=sys.stderr)
+        if selection in os.environ or prefixed in os.environ:
+            print(f"Unknown variable: {selection} (but it is already set in the environment, perhaps already decrypted?)", file=sys.stderr)
+        else:
+            print(f"Unknown variable: {selection}", file=sys.stderr)
         sys.exit(1)
 
     password = getpass("Password: ")
