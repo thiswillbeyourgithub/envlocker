@@ -226,11 +226,22 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
             if prefixed in encrypted:
                 selection = prefixed
             else:
-                if selection in os.environ or prefixed in os.environ:
-                    print(f"Unknown variable: {selection} (but it is already set in the environment, perhaps already decrypted?)", file=sys.stderr)
+                # Prefix search: find all encrypted vars whose original name starts with the given input
+                query_upper = selection.upper()
+                prefix_matches = [k for k in encrypted if original_name(k).upper().startswith(query_upper)]
+                if len(prefix_matches) == 1:
+                    selection = prefix_matches[0]
+                    print(f"# Matched: {original_name(selection)}", file=sys.stderr)
+                elif len(prefix_matches) > 1:
+                    names = ", ".join(sorted(original_name(k) for k in prefix_matches))
+                    print(f"Ambiguous prefix '{selection}': matches {names}", file=sys.stderr)
+                    sys.exit(1)
                 else:
-                    print(f"Unknown variable: {selection}", file=sys.stderr)
-                sys.exit(1)
+                    if selection in os.environ or prefixed in os.environ:
+                        print(f"Unknown variable: {selection} (but it is already set in the environment, perhaps already decrypted?)", file=sys.stderr)
+                    else:
+                        print(f"Unknown variable: {selection}", file=sys.stderr)
+                    sys.exit(1)
         password = getpass("Password: ")
         _decrypt_vars({selection: encrypted[selection]}, salt, password)
         return

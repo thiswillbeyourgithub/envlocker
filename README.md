@@ -63,6 +63,14 @@ Or decrypt a specific variable by name:
 envlocker decrypt MY_API_KEY
 ```
 
+You can also use a prefix — if exactly one encrypted variable's name starts with the given string, it is selected automatically:
+
+```bash
+envlocker decrypt MY_API   # selects MY_API_KEY if it's the only match
+```
+
+If the prefix matches multiple variables, an error lists the candidates.
+
 ### Decrypt all
 
 Decrypt all matching encrypted variables at once:
