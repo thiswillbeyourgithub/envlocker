@@ -2,7 +2,7 @@
 # Source this file in your shell rc.
 # Built with Claude Code.
 #
-# Usage: envlocker [--keys PATTERN...] [--ignore PATTERN...] encrypt|decrypt [KEY...]|decrypt-all
+# Usage: envlocker [--keys PATTERN...] [--ignore PATTERN...] encrypt|e|decrypt|d [KEY...]|decrypt-all|da
 
 _ENVLOCKER_PY='#!/usr/bin/env python3
 # /// script
@@ -305,17 +305,17 @@ def main() -> None:
         help="Regex patterns for env var names to exclude (e.g. COMPANY_SALT)",
     )
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("encrypt", help="Encrypt matching env vars")
-    dec = sub.add_parser("decrypt", help="Decrypt a selected env var")
+    sub.add_parser("encrypt", aliases=["e"], help="Encrypt matching env vars")
+    dec = sub.add_parser("decrypt", aliases=["d"], help="Decrypt a selected env var")
     dec.add_argument("names", nargs="*", default=[], help="Variable name(s) to decrypt (skip interactive prompt). Multiple names can be passed.")
-    sub.add_parser("decrypt-all", help="Decrypt all matching encrypted env vars")
+    sub.add_parser("decrypt-all", aliases=["da"], help="Decrypt all matching encrypted env vars")
 
     args = parser.parse_args()
-    if args.command == "encrypt":
+    if args.command in ("encrypt", "e"):
         cmd_encrypt(args)
-    elif args.command == "decrypt":
+    elif args.command in ("decrypt", "d"):
         cmd_decrypt(args)
-    elif args.command == "decrypt-all":
+    elif args.command in ("decrypt-all", "da"):
         cmd_decrypt_all(args)
 
 

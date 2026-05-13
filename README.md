@@ -80,6 +80,16 @@ Decrypt all matching encrypted variables at once:
 envlocker decrypt-all
 ```
 
+### Short aliases
+
+The subcommands have short aliases: `e` for `encrypt`, `d` for `decrypt`, `da` for `decrypt-all`.
+
+```bash
+envlocker e
+envlocker d MY_API_KEY
+envlocker da
+```
+
 ### Key patterns
 
 The `--keys` flag accepts regex patterns matched against variable names. The default pattern matches names containing `PASS`, `PSWD`, `PASSWORD`, `PASSPHRASE`, `KEY`, `SECRET`, `TOKEN`, `SALT`, or `TKN` anywhere in the name. Examples:
