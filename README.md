@@ -57,19 +57,20 @@ Interactive mode (with tab-autocomplete):
 envlocker decrypt
 ```
 
-Or decrypt a specific variable by name:
+Or decrypt one or more specific variables by name (single password prompt for the batch):
 
 ```bash
 envlocker decrypt MY_API_KEY
+envlocker decrypt openai mistral amazon
 ```
 
-You can also use a prefix — if exactly one encrypted variable's name starts with the given string, it is selected automatically:
+You can also use a prefix: if exactly one encrypted variable's name starts with the given string, it is selected automatically:
 
 ```bash
 envlocker decrypt MY_API   # selects MY_API_KEY if it's the only match
 ```
 
-If the prefix matches multiple variables, an error lists the candidates.
+If a prefix matches multiple variables, an error lists the candidates. If any one of the given names cannot be resolved, the whole command aborts before prompting for a password.
 
 ### Decrypt all
 

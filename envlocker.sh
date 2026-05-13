@@ -2,7 +2,7 @@
 # Source this file in your shell rc.
 # Built with Claude Code.
 #
-# Usage: envlocker [--keys PATTERN...] [--ignore PATTERN...] encrypt|decrypt [KEY]|decrypt-all
+# Usage: envlocker [--keys PATTERN...] [--ignore PATTERN...] encrypt|decrypt [KEY...]|decrypt-all
 
 _ENVLOCKER_PY='#!/usr/bin/env python3
 # /// script
@@ -193,6 +193,30 @@ def _decrypt_vars(encrypted: dict[str, str], salt: str, password: str) -> None:
         _write_unset(k)
 
 
+def _resolve_name(name: str, encrypted: dict[str, str]) -> str:
+    """Resolve a user-supplied name to a key in `encrypted`, accepting EVL_FOO, FOO, or a unique prefix."""
+    if name in encrypted:
+        return name
+    prefixed = NAME_PREFIX + name
+    if prefixed in encrypted:
+        return prefixed
+    query_upper = name.upper()
+    prefix_matches = [k for k in encrypted if original_name(k).upper().startswith(query_upper)]
+    if len(prefix_matches) == 1:
+        selection = prefix_matches[0]
+        print(f"# Matched: {original_name(selection)}", file=sys.stderr)
+        return selection
+    if len(prefix_matches) > 1:
+        names = ", ".join(sorted(original_name(k) for k in prefix_matches))
+        print(f"Ambiguous prefix {name}: matches {names}", file=sys.stderr)
+        sys.exit(1)
+    if name in os.environ or prefixed in os.environ:
+        print(f"Unknown variable: {name} (but it is already set in the environment, perhaps already decrypted?)", file=sys.stderr)
+    else:
+        print(f"Unknown variable: {name}", file=sys.stderr)
+    sys.exit(1)
+
+
 def cmd_decrypt(args: argparse.Namespace) -> None:
     salt = os.environ.get(SALT_ENV, "")
     if not salt:
@@ -217,33 +241,15 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
         print("# No matching encrypted env vars found.", file=sys.stderr)
         return
 
-    # If a specific key name was given, decrypt it directly
+    # If specific key names were given, decrypt them directly
     # Accept both EVL_FOO and FOO as input
-    if args.name:
-        selection = args.name
-        if selection not in encrypted:
-            prefixed = NAME_PREFIX + selection
-            if prefixed in encrypted:
-                selection = prefixed
-            else:
-                # Prefix search: find all encrypted vars whose original name starts with the given input
-                query_upper = selection.upper()
-                prefix_matches = [k for k in encrypted if original_name(k).upper().startswith(query_upper)]
-                if len(prefix_matches) == 1:
-                    selection = prefix_matches[0]
-                    print(f"# Matched: {original_name(selection)}", file=sys.stderr)
-                elif len(prefix_matches) > 1:
-                    names = ", ".join(sorted(original_name(k) for k in prefix_matches))
-                    print(f"Ambiguous prefix '{selection}': matches {names}", file=sys.stderr)
-                    sys.exit(1)
-                else:
-                    if selection in os.environ or prefixed in os.environ:
-                        print(f"Unknown variable: {selection} (but it is already set in the environment, perhaps already decrypted?)", file=sys.stderr)
-                    else:
-                        print(f"Unknown variable: {selection}", file=sys.stderr)
-                    sys.exit(1)
+    if args.names:
+        selections = {}
+        for name in args.names:
+            selection = _resolve_name(name, encrypted)
+            selections[selection] = encrypted[selection]
         password = getpass("Password: ")
-        _decrypt_vars({selection: encrypted[selection]}, salt, password)
+        _decrypt_vars(selections, salt, password)
         return
 
     # Interactive selection with autocomplete — show original names
@@ -258,17 +264,7 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
         "Variable to decrypt (tab to autocomplete): ", completer=completer
     ).strip()
 
-    # Map back to EVL_ prefixed name
-    prefixed = NAME_PREFIX + selection
-    if prefixed in encrypted:
-        selection = prefixed
-    elif selection not in encrypted:
-        if selection in os.environ or prefixed in os.environ:
-            print(f"Unknown variable: {selection} (but it is already set in the environment, perhaps already decrypted?)", file=sys.stderr)
-        else:
-            print(f"Unknown variable: {selection}", file=sys.stderr)
-        sys.exit(1)
-
+    selection = _resolve_name(selection, encrypted)
     password = getpass("Password: ")
     _decrypt_vars({selection: encrypted[selection]}, salt, password)
 
@@ -311,7 +307,7 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("encrypt", help="Encrypt matching env vars")
     dec = sub.add_parser("decrypt", help="Decrypt a selected env var")
-    dec.add_argument("name", nargs="?", default=None, help="Variable name to decrypt (skip interactive prompt)")
+    dec.add_argument("names", nargs="*", default=[], help="Variable name(s) to decrypt (skip interactive prompt). Multiple names can be passed.")
     sub.add_parser("decrypt-all", help="Decrypt all matching encrypted env vars")
 
     args = parser.parse_args()
