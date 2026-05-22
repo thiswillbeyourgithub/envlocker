@@ -80,14 +80,26 @@ Decrypt all matching encrypted variables at once:
 envlocker decrypt-all
 ```
 
+### Check (decrypt-if-needed)
+
+For use in scripts that need a specific variable available in plain form. If the named variable is still encrypted, you get the password prompt and it is decrypted in place. If it is already decrypted (or no encrypted match exists), `check` exits 0 silently so the script keeps going:
+
+```bash
+envlocker check MY_API_KEY
+my_script_that_uses_MY_API_KEY
+```
+
+Prefix matching and multiple names work the same way as `decrypt`. Ambiguous prefixes exit non-zero with the candidate list.
+
 ### Short aliases
 
-The subcommands have short aliases: `e` for `encrypt`, `d` for `decrypt`, `da` for `decrypt-all`.
+The subcommands have short aliases: `e` for `encrypt`, `d` for `decrypt`, `da` for `decrypt-all`, `c` for `check`.
 
 ```bash
 envlocker e
 envlocker d MY_API_KEY
 envlocker da
+envlocker c MY_API_KEY
 ```
 
 ### Key patterns

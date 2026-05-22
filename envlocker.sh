@@ -2,7 +2,7 @@
 # Source this file in your shell rc.
 # Built with Claude Code.
 #
-# Usage: envlocker [--keys PATTERN...] [--ignore PATTERN...] encrypt|e|decrypt|d [KEY...]|decrypt-all|da
+# Usage: envlocker [--keys PATTERN...] [--ignore PATTERN...] encrypt|e|decrypt|d [KEY...]|decrypt-all|da|check|c KEY...
 
 _ENVLOCKER_PY='#!/usr/bin/env python3
 # /// script
@@ -193,8 +193,12 @@ def _decrypt_vars(encrypted: dict[str, str], salt: str, password: str) -> None:
         _write_unset(k)
 
 
-def _resolve_name(name: str, encrypted: dict[str, str]) -> str:
-    """Resolve a user-supplied name to a key in `encrypted`, accepting EVL_FOO, FOO, or a unique prefix."""
+def _resolve_name(name: str, encrypted: dict[str, str], allow_missing: bool = False) -> str | None:
+    """Resolve a user-supplied name to a key in `encrypted`, accepting EVL_FOO, FOO, or a unique prefix.
+
+    If allow_missing is True, returns None when no encrypted match is found (instead of exiting).
+    Ambiguous prefix matches still exit.
+    """
     if name in encrypted:
         return name
     prefixed = NAME_PREFIX + name
@@ -210,6 +214,8 @@ def _resolve_name(name: str, encrypted: dict[str, str]) -> str:
         names = ", ".join(sorted(original_name(k) for k in prefix_matches))
         print(f"Ambiguous prefix {name}: matches {names}", file=sys.stderr)
         sys.exit(1)
+    if allow_missing:
+        return None
     if name in os.environ or prefixed in os.environ:
         print(f"Unknown variable: {name} (but it is already set in the environment, perhaps already decrypted?)", file=sys.stderr)
     else:
@@ -269,6 +275,29 @@ def cmd_decrypt(args: argparse.Namespace) -> None:
     _decrypt_vars({selection: encrypted[selection]}, salt, password)
 
 
+def cmd_check(args: argparse.Namespace) -> None:
+    encrypted = collect_encrypted_vars(args.keys, args.ignore)
+
+    selections = {}
+    for name in args.names:
+        selection = _resolve_name(name, encrypted, allow_missing=True)
+        if selection is not None:
+            selections[selection] = encrypted[selection]
+        else:
+            print(f"# {name}: no encrypted match, nothing to do.", file=sys.stderr)
+
+    if not selections:
+        sys.exit(0)
+
+    salt = os.environ.get(SALT_ENV, "")
+    if not salt:
+        print(f"Error: {SALT_ENV} not set.", file=sys.stderr)
+        sys.exit(1)
+
+    password = getpass("Password: ")
+    _decrypt_vars(selections, salt, password)
+
+
 def cmd_decrypt_all(args: argparse.Namespace) -> None:
     salt = os.environ.get(SALT_ENV, "")
     if not salt:
@@ -309,6 +338,8 @@ def main() -> None:
     dec = sub.add_parser("decrypt", aliases=["d"], help="Decrypt a selected env var")
     dec.add_argument("names", nargs="*", default=[], help="Variable name(s) to decrypt (skip interactive prompt). Multiple names can be passed.")
     sub.add_parser("decrypt-all", aliases=["da"], help="Decrypt all matching encrypted env vars")
+    chk = sub.add_parser("check", aliases=["c"], help="Decrypt named var(s) only if still encrypted; otherwise exit 0")
+    chk.add_argument("names", nargs="+", help="Variable name(s) to check. If still encrypted, prompts to decrypt; otherwise exits 0.")
 
     args = parser.parse_args()
     if args.command in ("encrypt", "e"):
@@ -317,6 +348,8 @@ def main() -> None:
         cmd_decrypt(args)
     elif args.command in ("decrypt-all", "da"):
         cmd_decrypt_all(args)
+    elif args.command in ("check", "c"):
+        cmd_check(args)
 
 
 if __name__ == "__main__":
